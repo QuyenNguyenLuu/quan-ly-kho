@@ -219,7 +219,7 @@ function logout(){ CURRENT=null; renderGate(); }
 function isAdmin(){ return CURRENT&&CURRENT.role==='admin'; }
 
 /* ===== shell ===== */
-const TAB_TITLE={dashboard:'Bảng điều khiển',stock:'Tồn kho',inout:'Nhập / Xuất kho',report:'Báo cáo',goods:'Hàng hoá',depts:'Phòng ban',users:'Người dùng'};
+const TAB_TITLE={dashboard:'Bảng điều khiển ',stock:'Tồn kho',inout:'Nhập / Xuất kho',report:'Báo cáo',goods:'Hàng hoá',depts:'Phòng ban',users:'Người dùng'};
 function renderApp(){
   const groups=[
     {sec:'Tổng quan',items:[['dashboard','Bảng điều khiển']]},
