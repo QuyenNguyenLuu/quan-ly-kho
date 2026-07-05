@@ -120,6 +120,27 @@
   .prog{height:7px;background:#eae4d8;border-radius:20px;overflow:hidden;min-width:120px}
   .prog > i{display:block;height:100%;background:var(--accent);border-radius:20px}
 
+  /* report sub-tabs */
+  .rtabs{display:flex;gap:8px;margin-bottom:20px;border-bottom:1px solid var(--line)}
+
+  /* stock hero banner trên dashboard */
+  .stock-hero{display:flex;flex-wrap:wrap;gap:24px;justify-content:space-between;align-items:center;background:var(--side);color:#fff;border-radius:8px;padding:26px 30px;margin-bottom:24px}
+  .sh-main .sh-label{font-size:13px;letter-spacing:1px;text-transform:uppercase;color:#9db0ad;font-weight:600}
+  .sh-main .sh-value{font-family:var(--serif);font-size:46px;font-weight:600;line-height:1.1;margin:6px 0 4px;color:#fff}
+  .sh-main .sh-value span{font-family:'Inter',sans-serif;font-size:16px;font-weight:400;color:#9db0ad;margin-left:4px}
+  .sh-main .sh-sub{font-size:13.5px;color:#b6c4c2}
+  .sh-side{display:flex;align-items:center;gap:26px;flex-wrap:wrap}
+  .sh-stat{text-align:center}
+  .sh-stat .n{font-family:var(--serif);font-size:28px;font-weight:600;color:#fff}
+  .sh-stat .n.warn{color:#e0b869} .sh-stat .n.danger{color:#e09a8f}
+  .sh-stat .t{font-size:12px;color:#9db0ad;margin-top:2px}
+  .sh-link{background:rgba(255,255,255,.1);color:#fff;font-size:13px;font-weight:600;padding:10px 16px;border-radius:22px;transition:.13s;white-space:nowrap}
+  .sh-link:hover{background:rgba(255,255,255,.2)}
+  .rtab{padding:10px 18px;font-size:14px;font-weight:600;color:var(--muted);background:none;border:none;border-bottom:2px solid transparent;margin-bottom:-1px;transition:.13s;font-family:var(--serif)}
+  .rtab:hover{color:var(--ink)}
+  .rtab.on{color:var(--accent-dark);border-bottom-color:var(--accent)}
+  tfoot td{padding:13px 20px;border-top:2px solid var(--line);font-size:14px;background:#faf8f2}
+
   /* ===== forms ===== */
   .form-grid{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(200px,1fr))}
   .field label{display:block;font-size:12px;font-weight:600;color:var(--label);margin-bottom:6px}
@@ -326,6 +347,19 @@ function vDash(v){
   const maxQty=Math.max(...DB.goods.map(g=>g.qty),1);
   v.innerHTML=`
   <div class="pagehead"><h2>Bảng điều khiển</h2><div class="sub">Tổng quan kho hàng · tháng ${m.split('-').reverse().join('/')}</div></div>
+  <div class="stock-hero">
+    <div class="sh-main">
+      <div class="sh-label">Tổng tồn kho hiện tại</div>
+      <div class="sh-value">${fmt(totalQty)} <span>đơn vị</span></div>
+      <div class="sh-sub">${DB.goods.length} mặt hàng đang theo dõi</div>
+    </div>
+    <div class="sh-side">
+      <div class="sh-stat"><div class="n">${DB.goods.filter(g=>g.qty>10).length}</div><div class="t">Còn đủ</div></div>
+      <div class="sh-stat"><div class="n warn">${low.length}</div><div class="t">Sắp hết</div></div>
+      <div class="sh-stat"><div class="n danger">${DB.goods.filter(g=>g.qty<=0).length}</div><div class="t">Hết hàng</div></div>
+      <button class="sh-link" onclick="activeTab='report';reportMode='stock';renderApp()">Xem báo cáo tồn kho →</button>
+    </div>
+  </div>
   <div class="kpis">
     <div class="kpi"><div class="k">Mặt hàng</div><div class="v">${DB.goods.length}</div><div class="d">danh mục</div></div>
     <div class="kpi"><div class="k">Tổng tồn kho</div><div class="v accent">${fmt(totalQty)}</div><div class="d">đơn vị</div></div>
@@ -413,10 +447,23 @@ async function delTxn(id){
 }
 
 /* ===== báo cáo ===== */
+let reportMode='flow'; // 'flow' = nhập-xuất-tồn, 'stock' = tồn kho hiện tại
 function vReport(v){
-  const m=today().slice(0,7);
   v.innerHTML=`
-  <div class="pagehead"><h2>Báo cáo nhập – xuất – tồn</h2><div class="sub">Theo tháng hoặc khoảng thời gian tuỳ chọn</div></div>
+  <div class="pagehead"><h2>Báo cáo kho</h2><div class="sub">Báo cáo nhập – xuất – tồn và tồn kho hiện tại</div></div>
+  <div class="rtabs">
+    <button class="rtab ${reportMode==='flow'?'on':''}" onclick="setReportMode('flow')">Nhập – xuất – tồn</button>
+    <button class="rtab ${reportMode==='stock'?'on':''}" onclick="setReportMode('stock')">Tồn kho hiện tại</button>
+  </div>
+  <div id="rp-body"></div>`;
+  renderReportBody();
+}
+function setReportMode(m){ reportMode=m; vReport(document.getElementById('view')); }
+function renderReportBody(){
+  const b=document.getElementById('rp-body');
+  if(reportMode==='stock'){ vStockReport(b); return; }
+  const m=today().slice(0,7);
+  b.innerHTML=`
   <div class="panel"><div class="panel-head"><h3>Bộ lọc</h3></div>
     <div style="padding:20px 22px" class="filter-bar">
       <div class="field"><label>Kiểu lọc</label><select id="rp-mode" onchange="rpModeChange()"><option value="month">Theo tháng</option><option value="range">Khoảng thời gian</option></select></div>
@@ -430,6 +477,42 @@ function vReport(v){
   </div>
   <div id="rp-result"></div>`;
   runReport();
+}
+
+/* ===== báo cáo tồn kho hiện tại ===== */
+function vStockReport(b){
+  const stores=DB.depts.filter(d=>d.type==='kho');
+  // tồn thực trong kho = tồn hệ thống của mặt hàng (số hàng còn nằm ở kho, chưa cấp cho điểm tiêu thụ)
+  const rows=DB.goods.map(g=>({code:g.code,name:g.name,qty:g.qty})).sort((a,b)=>a.code.localeCompare(b.code));
+  const total=rows.reduce((s,r)=>s+r.qty,0);
+  const low=rows.filter(r=>r.qty<=10).length;
+  const out=rows.filter(r=>r.qty<=0).length;
+  lastReport={rows:rows.map(r=>({code:r.code,name:r.name,opening:'',inP:'',outP:'',closing:r.qty})),label:'ton-kho-hien-tai',stock:true};
+  b.innerHTML=`
+  <div class="kpis">
+    <div class="kpi"><div class="k">Mặt hàng</div><div class="v">${rows.length}</div><div class="d">danh mục</div></div>
+    <div class="kpi"><div class="k">Tổng tồn kho</div><div class="v accent">${fmt(total)}</div><div class="d">đơn vị đang có</div></div>
+    <div class="kpi"><div class="k">Sắp hết</div><div class="v warn">${low}</div><div class="d">≤ 10 đơn vị</div></div>
+    <div class="kpi"><div class="k">Hết hàng</div><div class="v danger">${out}</div><div class="d">= 0</div></div>
+  </div>
+  <div class="panel"><div class="panel-head"><h3>Tồn kho hiện tại${stores.length?' · '+stores.map(s=>esc(s.name)).join(', '):''}</h3>
+    <button class="btn btn-ghost" onclick="exportStockCSV()">Xuất CSV</button></div>
+    <table><thead><tr><th>Mã hàng</th><th>Tên hàng</th><th class="num">Số lượng tồn</th><th class="num">Trạng thái</th></tr></thead>
+    <tbody>${rows.length?rows.map(r=>`<tr><td><b>${esc(r.code)}</b></td><td>${esc(r.name)}</td>
+      <td class="num strong ${r.qty<=10?'qty-low':''}">${fmt(r.qty)}</td>
+      <td class="num">${r.qty<=0?'<span class="tag tag-out">Hết hàng</span>':r.qty<=10?'<span class="tag tag-out">Sắp hết</span>':r.qty<=30?'<span class="tag tag-warn">Trung bình</span>':'<span class="tag tag-in">Đủ</span>'}</td></tr>`).join(''):'<tr><td colspan="4" class="empty">Chưa có hàng hoá.</td></tr>'}
+    </tbody>
+    ${rows.length?`<tfoot><tr><td colspan="2" class="strong">Tổng cộng</td><td class="num strong">${fmt(total)}</td><td></td></tr></tfoot>`:''}
+    </table>
+  </div>`;
+}
+function exportStockCSV(){
+  const rows=DB.goods.map(g=>({code:g.code,name:g.name,qty:g.qty})).sort((a,b)=>a.code.localeCompare(b.code));
+  let csv='Ma,Ten hang,So luong ton\n';
+  rows.forEach(r=>csv+=`${r.code},"${r.name}",${r.qty}\n`);
+  csv+=`,TONG CONG,${rows.reduce((s,r)=>s+r.qty,0)}\n`;
+  const blob=new Blob(['\ufeff'+csv],{type:'text/csv;charset=utf-8'}),a=document.createElement('a');
+  a.href=URL.createObjectURL(blob); a.download='ton-kho-hien-tai.csv'; a.click(); toast('Đã xuất CSV');
 }
 function rpModeChange(){
   const r=document.getElementById('rp-mode').value==='range';
