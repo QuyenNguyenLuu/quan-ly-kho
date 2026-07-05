@@ -164,7 +164,7 @@ let CURRENT=null,activeTab='dashboard';
 async function load(){
   try{ const raw=localStorage.getItem('inv-db'); if(raw){ DB=JSON.parse(raw); return; } }catch(e){}
   DB={
-    users:[{id:uid(),name:'Quản trị viên',username:'admin',role:'admin'}],
+    users:[{id:uid(), password:password(),name:'Quản trị viên',username:'admin',role:'admin'}],
     goods:[
       {id:uid(),code:'SP001',name:'Gạo ST25 (bao 5kg)',qty:120},
       {id:uid(),code:'SP002',name:'Nước mắm (thùng 12 chai)',qty:34},
