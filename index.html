@@ -156,29 +156,42 @@
 
 <script>
 /* ====== thông tin có thể chỉnh ====== */
-const CLIENT = { name:'Coco Cottage', short:'Quản lý kho' };  // công ty sử dụng phần mềm
-const CLIENT = { name:'Kho Vận Minh Phát', short:'Quản lý kho' }; // công ty sử dụng phần mềm
+const CLIENT = { name:'Coco', short:'Quản lý kho' };  // công ty sử dụng phần mềm
 
 let DB={users:[],goods:[],depts:[],txns:[]};
 let CURRENT=null,activeTab='dashboard';
 
+/* hash mật khẩu bằng SHA-256 (không lưu mật khẩu dạng chữ thô) */
+async function hashPw(pw){
+  const buf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(pw));
+  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+
 async function load(){
-  try{ const raw=localStorage.getItem('inv-db'); if(raw){ DB=JSON.parse(raw); return; } }catch(e){}
-  DB={
-    users:[{id:uid(), password:password(),name:'Quản trị viên',username:'admin',role:'admin'}],
-    goods:[
-      {id:uid(),code:'SP001',name:'Gạo ST25 (bao 5kg)',qty:120},
-      {id:uid(),code:'SP002',name:'Nước mắm (thùng 12 chai)',qty:34},
-      {id:uid(),code:'SP003',name:'Khăn tắm khách sạn',qty:8},
-    ],
-    depts:[
-      {id:uid(),name:'Kho chính',type:'kho'},
-      {id:uid(),name:'Nhà hàng',type:'tieu-thu'},
-      {id:uid(),name:'Phòng ngủ',type:'tieu-thu'},
-    ],
-    txns:[]
-  };
-  await save();
+  let loaded=false;
+  try{ const raw=localStorage.getItem('inv-db'); if(raw){ DB=JSON.parse(raw); loaded=true; } }catch(e){}
+  if(!loaded){
+    DB={
+      users:[{id:uid(),name:'Quản trị viên',username:'admin',role:'admin',pw:await hashPw('admin')}],
+      goods:[
+        {id:uid(),code:'SP001',name:'Gạo ST25 (bao 5kg)',qty:120},
+        {id:uid(),code:'SP002',name:'Nước mắm (thùng 12 chai)',qty:34},
+        {id:uid(),code:'SP003',name:'Khăn tắm khách sạn',qty:8},
+      ],
+      depts:[
+        {id:uid(),name:'Kho chính',type:'kho'},
+        {id:uid(),name:'Nhà hàng',type:'tieu-thu'},
+        {id:uid(),name:'Phòng ngủ',type:'tieu-thu'},
+      ],
+      txns:[]
+    };
+    await save();
+    return;
+  }
+  // nâng cấp dữ liệu cũ chưa có mật khẩu → đặt mật khẩu = tên đăng nhập
+  let changed=false;
+  for(const u of DB.users){ if(!u.pw){ u.pw=await hashPw(u.username); changed=true; } }
+  if(changed) await save();
 }
 async function save(){ try{ localStorage.setItem('inv-db',JSON.stringify(DB)); }catch(e){ toast('Không lưu được dữ liệu'); } }
 function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
@@ -204,23 +217,26 @@ function renderGate(){
   <div class="gate">
     <div class="gate-card">
       <div class="top">${brandMark(42)}<div><h1>${esc(CLIENT.name)}</h1><div class="lead">Hệ thống quản lý kho hàng</div></div></div>
-      <div class="field"><label>Tên đăng nhập</label><input id="lg-user" placeholder="admin" onkeydown="if(event.key==='Enter')doLogin()"></div>
+      <div class="field"><label>Tên đăng nhập</label><input id="lg-user" placeholder="admin" onkeydown="if(event.key==='Enter')document.getElementById('lg-pass').focus()"></div>
+      <div class="field"><label>Mật khẩu</label><input id="lg-pass" type="password" placeholder="••••••" onkeydown="if(event.key==='Enter')doLogin()"></div>
       <button class="btn btn-primary" style="width:100%;justify-content:center;margin-top:16px" onclick="doLogin()">Đăng nhập</button>
-      <p class="hint">Tài khoản mặc định: <b style="color:var(--ink)">admin</b></p>
+      <p class="hint">Tài khoản mặc định: <b style="color:var(--ink)">admin</b> / <b style="color:var(--ink)">admin</b></p>
     </div>
   </div>`;
 }
-function doLogin(){
+async function doLogin(){
   const u=document.getElementById('lg-user').value.trim().toLowerCase();
+  const p=document.getElementById('lg-pass').value;
   const f=DB.users.find(x=>x.username.toLowerCase()===u);
   if(!f){ toast('Không tìm thấy tài khoản'); return; }
+  if(f.pw!==await hashPw(p)){ toast('Sai mật khẩu'); return; }
   CURRENT=f; renderApp();
 }
 function logout(){ CURRENT=null; renderGate(); }
 function isAdmin(){ return CURRENT&&CURRENT.role==='admin'; }
 
 /* ===== shell ===== */
-const TAB_TITLE={dashboard:'Bảng điều khiển ',stock:'Tồn kho',inout:'Nhập / Xuất kho',report:'Báo cáo',goods:'Hàng hoá',depts:'Phòng ban',users:'Người dùng'};
+const TAB_TITLE={dashboard:'Bảng điều khiển',stock:'Tồn kho',inout:'Nhập / Xuất kho',report:'Báo cáo',goods:'Hàng hoá',depts:'Phòng ban',users:'Người dùng'};
 function renderApp(){
   const groups=[
     {sec:'Tổng quan',items:[['dashboard','Bảng điều khiển']]},
@@ -240,7 +256,7 @@ function renderApp(){
     <main>
       <div class="topbar">
         <div class="crumb"><b>${TAB_TITLE[activeTab]}</b></div>
-        <div class="uchip"><div class="av">${initials(CURRENT.name)}</div>${esc(CURRENT.name)}<button class="logout" onclick="logout()">Đăng xuất</button></div>
+        <div class="uchip"><div class="av">${initials(CURRENT.name)}</div>${esc(CURRENT.name)}<button class="logout" onclick="changeOwnPw()">Đổi mật khẩu</button><button class="logout" onclick="logout()">Đăng xuất</button></div>
       </div>
       <div class="content"><div id="view"></div></div>
     </main>
@@ -486,12 +502,16 @@ function userForm(id){
   modal(id?'Sửa người dùng':'Thêm người dùng',`
     <div class="field"><label>Họ tên</label><input id="u-name" value="${esc(u.name)}"></div>
     <div class="field"><label>Tên đăng nhập</label><input id="u-username" value="${esc(u.username)}"></div>
+    <div class="field"><label>Mật khẩu ${id?'(để trống nếu giữ nguyên)':''}</label><input id="u-pass" type="password" placeholder="${id?'••••••':'Nhập mật khẩu'}"></div>
     <div class="field"><label>Vai trò</label><select id="u-role"><option value="staff" ${u.role==='staff'?'selected':''}>Nhân viên</option><option value="admin" ${u.role==='admin'?'selected':''}>Quản trị viên</option></select></div>`,
   async()=>{
     const name=val('u-name'),username=val('u-username').toLowerCase(),role=document.getElementById('u-role').value;
+    const pass=document.getElementById('u-pass').value;
     if(!name||!username){ toast('Nhập đủ thông tin'); return false; }
+    if(!id&&!pass){ toast('Nhập mật khẩu cho tài khoản mới'); return false; }
     if(DB.users.some(x=>x.username.toLowerCase()===username&&x.id!==id)){ toast('Tên đăng nhập đã tồn tại'); return false; }
-    if(id) Object.assign(u,{name,username,role}); else DB.users.push({id:uid(),name,username,role});
+    if(id){ Object.assign(u,{name,username,role}); if(pass) u.pw=await hashPw(pass); }
+    else DB.users.push({id:uid(),name,username,role,pw:await hashPw(pass)});
     await save(); toast('Đã lưu'); renderTab(); return true;
   });
 }
@@ -499,6 +519,20 @@ async function delUser(id){
   if(DB.users.filter(u=>u.role==='admin').length<=1&&DB.users.find(u=>u.id===id)?.role==='admin'){ toast('Phải còn ít nhất 1 quản trị viên'); return; }
   if(!confirm('Xoá người dùng này?'))return;
   DB.users=DB.users.filter(x=>x.id!==id); await save(); toast('Đã xoá'); renderTab();
+}
+/* đổi mật khẩu của chính tài khoản đang đăng nhập */
+function changeOwnPw(){
+  modal('Đổi mật khẩu',`
+    <div class="field"><label>Mật khẩu hiện tại</label><input id="cp-old" type="password" placeholder="••••••"></div>
+    <div class="field"><label>Mật khẩu mới</label><input id="cp-new" type="password" placeholder="Ít nhất 4 ký tự"></div>
+    <div class="field"><label>Nhập lại mật khẩu mới</label><input id="cp-new2" type="password" placeholder="••••••"></div>`,
+  async()=>{
+    const oldp=document.getElementById('cp-old').value,np=document.getElementById('cp-new').value,np2=document.getElementById('cp-new2').value;
+    if(CURRENT.pw!==await hashPw(oldp)){ toast('Mật khẩu hiện tại không đúng'); return false; }
+    if(np.length<4){ toast('Mật khẩu mới quá ngắn'); return false; }
+    if(np!==np2){ toast('Mật khẩu nhập lại không khớp'); return false; }
+    CURRENT.pw=await hashPw(np); await save(); toast('Đã đổi mật khẩu'); return true;
+  });
 }
 
 /* ===== modal ===== */
