@@ -331,8 +331,13 @@ function renderApp(){
   </div>`;
   renderTab();
 }
-function go(t){ activeTab=t; renderApp(); }
-function renderTab(){ ({dashboard:vDash,stock:vStock,inout:vInout,report:vReport,goods:vGoods,depts:vDepts,users:vUsers}[activeTab]||vDash)(document.getElementById('view')); }
+const ADMIN_TABS=['users'];
+function go(t){ if(ADMIN_TABS.includes(t)&&!isAdmin()){ toast('Chỉ quản trị viên mới truy cập được'); return; } activeTab=t; renderApp(); }
+function renderTab(){
+  // chặn tab dành riêng cho quản trị viên
+  if(ADMIN_TABS.includes(activeTab)&&!isAdmin()){ activeTab='dashboard'; }
+  ({dashboard:vDash,stock:vStock,inout:vInout,report:vReport,goods:vGoods,depts:vDepts,users:vUsers}[activeTab]||vDash)(document.getElementById('view'));
+}
 
 /* ===== dashboard ===== */
 function vDash(v){
@@ -584,6 +589,7 @@ function vGoods(v){
     ${isAdmin()?`<td class="num"><div class="actions"><button class="btn-sm" onclick="goodForm('${g.id}')">Sửa</button><button class="btn-sm danger" onclick="delGood('${g.id}')">Xoá</button></div></td>`:''}</tr>`).join('')||`<tr><td colspan="4" class="empty">Chưa có hàng hoá.</td></tr>`}</tbody></table></div>`;
 }
 function goodForm(id){
+  if(!isAdmin()){ toast('Chỉ quản trị viên mới thao tác được'); return; }
   const g=id?DB.goods.find(x=>x.id===id):{code:'',name:'',qty:0};
   modal(id?'Sửa hàng hoá':'Thêm hàng hoá',`
     <div class="field"><label>Mã hàng</label><input id="g-code" value="${esc(g.code)}" placeholder="VD: SP004"></div>
@@ -598,6 +604,7 @@ function goodForm(id){
   });
 }
 async function delGood(id){
+  if(!isAdmin()){ toast('Chỉ quản trị viên mới thao tác được'); return; }
   if(DB.txns.some(t=>t.goodId===id)){ if(!confirm('Mặt hàng có giao dịch liên quan. Vẫn xoá?'))return; }
   else if(!confirm('Xoá mặt hàng này?'))return;
   DB.goods=DB.goods.filter(x=>x.id!==id); await save(); toast('Đã xoá'); renderTab();
@@ -613,6 +620,7 @@ function vDepts(v){
     ${isAdmin()?`<td class="num"><div class="actions"><button class="btn-sm" onclick="deptForm('${d.id}')">Sửa</button><button class="btn-sm danger" onclick="delDept('${d.id}')">Xoá</button></div></td>`:''}</tr>`).join('')||`<tr><td colspan="3" class="empty">Chưa có phòng ban.</td></tr>`}</tbody></table></div>`;
 }
 function deptForm(id){
+  if(!isAdmin()){ toast('Chỉ quản trị viên mới thao tác được'); return; }
   const d=id?DB.depts.find(x=>x.id===id):{name:'',type:'tieu-thu'};
   modal(id?'Sửa phòng ban':'Thêm phòng ban',`
     <div class="field"><label>Tên phòng ban</label><input id="d-name" value="${esc(d.name)}" placeholder="VD: Nhà hàng"></div>
@@ -625,13 +633,15 @@ function deptForm(id){
   });
 }
 async function delDept(id){
+  if(!isAdmin()){ toast('Chỉ quản trị viên mới thao tác được'); return; }
   if(DB.txns.some(t=>t.deptId===id)){ toast('Phòng ban đang có giao dịch, không thể xoá'); return; }
   if(!confirm('Xoá phòng ban này?'))return;
   DB.depts=DB.depts.filter(x=>x.id!==id); await save(); toast('Đã xoá'); renderTab();
 }
 
-/* ===== người dùng ===== */
+/* ===== người dùng (chỉ quản trị viên) ===== */
 function vUsers(v){
+  if(!isAdmin()){ v.innerHTML=`<div class="pagehead"><h2>Không có quyền truy cập</h2><div class="sub">Chỉ quản trị viên mới xem được mục Người dùng.</div></div>`; return; }
   v.innerHTML=`
   <div class="pagehead"><h2>Người dùng</h2><div class="sub">Quản trị viên có thể thêm, sửa, xoá tài khoản</div></div>
   <div class="panel"><div class="panel-head"><h3>${DB.users.length} tài khoản</h3><button class="btn btn-primary" onclick="userForm()">Thêm người dùng</button></div>
@@ -641,6 +651,7 @@ function vUsers(v){
     <td class="num"><div class="actions"><button class="btn-sm" onclick="userForm('${u.id}')">Sửa</button>${u.id!==CURRENT.id?`<button class="btn-sm danger" onclick="delUser('${u.id}')">Xoá</button>`:''}</div></td></tr>`).join('')}</tbody></table></div>`;
 }
 function userForm(id){
+  if(!isAdmin()){ toast('Chỉ quản trị viên mới thao tác được'); return; }
   const u=id?DB.users.find(x=>x.id===id):{name:'',username:'',role:'staff'};
   modal(id?'Sửa người dùng':'Thêm người dùng',`
     <div class="field"><label>Họ tên</label><input id="u-name" value="${esc(u.name)}"></div>
@@ -659,6 +670,7 @@ function userForm(id){
   });
 }
 async function delUser(id){
+  if(!isAdmin()){ toast('Chỉ quản trị viên mới thao tác được'); return; }
   if(DB.users.filter(u=>u.role==='admin').length<=1&&DB.users.find(u=>u.id===id)?.role==='admin'){ toast('Phải còn ít nhất 1 quản trị viên'); return; }
   if(!confirm('Xoá người dùng này?'))return;
   DB.users=DB.users.filter(x=>x.id!==id); await save(); toast('Đã xoá'); renderTab();
